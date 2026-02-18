@@ -1,5 +1,15 @@
-import { neon, neonConfig } from '@neondatabase/serverless';
+import { neon } from '@neondatabase/serverless';
 
+/**
+ * Neon HTTP 드라이버는 Direct Connection 엔드포인트만 지원합니다.
+ * Pooler 엔드포인트(-pooler)에는 /sql HTTP 프록시가 없어 404가 발생합니다.
+ * 
+ * 따라서 URL에서:
+ * 1. prisma+ 접두사 제거
+ * 2. -pooler 제거 (pooler -> direct 전환)
+ * 3. channel_binding 파라미터 제거 (HTTP 드라이버와 비호환)
+ * 4. sslmode 파라미터 제거 (HTTPS 위에서 동작하므로 불필요)
+ */
 const getSanitizedUrl = () => {
   const url = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
   if (!url) return null;
@@ -8,24 +18,31 @@ const getSanitizedUrl = () => {
     // 1. prisma+ 접두사 제거
     let cleanUrl = url.trim().replace('prisma+', '');
 
-    // 2. 쿼리 파라미터(?...) 제거
-    if (cleanUrl.includes('?')) {
-      cleanUrl = cleanUrl.split('?')[0];
+    // 2. URL 파싱
+    const urlObj = new URL(cleanUrl);
+
+    // 3. -pooler 제거 (Direct Connection으로 전환)
+    // 예: ep-fragrant-haze-ai7rav28-pooler.xxx -> ep-fragrant-haze-ai7rav28.xxx
+    if (urlObj.hostname.includes('-pooler')) {
+      urlObj.hostname = urlObj.hostname.replace('-pooler', '');
     }
 
-    // 마스킹된 로그 (Vercel 로그에서 확인 가능)
-    try {
-      const u = new URL(cleanUrl);
-      console.log(`[DB] Connecting to: ${u.protocol}//${u.username}:***@${u.host}${u.pathname}`);
-    } catch (e) { }
+    // 4. 모든 쿼리 파라미터 제거 (sslmode, channel_binding 등)
+    urlObj.search = '';
 
-    return cleanUrl;
+    const finalUrl = urlObj.toString();
+    console.log(`[DB] Direct endpoint: ${urlObj.hostname}`);
+    return finalUrl;
   } catch (e) {
-    return url;
+    // URL 파싱 실패 시 단순 문자열 처리로 폴백
+    let fallback = url.trim().replace('prisma+', '');
+    fallback = fallback.replace('-pooler', '');
+    if (fallback.includes('?')) fallback = fallback.split('?')[0];
+    return fallback;
   }
 };
 
-// SQL 실행 함수 (싱글톤 패턴)
+// 싱글톤 SQL 클라이언트
 let sqlClient: any = null;
 
 const getSql = () => {
@@ -47,18 +64,12 @@ export const db = {
   query: async (text: string, params: any[] = []) => {
     const sql = getSql();
     if (!sql) {
-      console.error('[DB] Database connection URL is missing. Check Vercel Environment Variables.');
-      throw new Error('데이터베이스 연결 설정이 누락되었습니다.');
+      throw new Error('DB 연결 설정이 누락되었습니다. Vercel 환경변수를 확인하세요.');
     }
 
-    try {
-      // Neon HTTP 드라이버의 최신 버전에서는 sql.query(text, params) 형식을 사용해야 함
-      const rows = await (sql as any).query(text, params);
-      return { rows: Array.isArray(rows) ? rows : [rows] };
-    } catch (err: any) {
-      console.error('[DB Query Error]:', err.message);
-      throw err;
-    }
+    // neon() 최신 API: sql.query(text, params) 사용  
+    const result = await (sql as any).query(text, params);
+    return { rows: Array.isArray(result) ? result : [] };
   },
 };
 
@@ -67,12 +78,12 @@ export async function initializeDatabase() {
 
   const url = getSanitizedUrl();
   if (!url) {
-    console.log('[DB] Skipping initialization (No URL).');
+    console.log('[DB] No URL found, skipping init.');
     return;
   }
 
   try {
-    console.log('[DB] HTTP Initialization started...');
+    console.log('[DB] Initializing tables...');
 
     await db.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
@@ -95,11 +106,11 @@ export async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('[DB] HTTP Initialization Success');
+    console.log('[DB] Tables OK');
   } catch (error: any) {
-    console.error('[DB] HTTP Initialization Failed:', error.message);
-    // 빌드 중에는 에러를 던지지 않고 로그만 남김 (빌드 성공을 위해)
-    if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
+    console.error('[DB] Init failed:', error.message);
+    // Vercel 빌드 시에는 에러를 던지지 않음 (런타임에만 throw)
+    if (!process.env.VERCEL) {
       throw error;
     }
   }
