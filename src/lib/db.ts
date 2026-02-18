@@ -1,58 +1,53 @@
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import ws from 'ws';
 
-// Neon Serverless 드라이버 설정: WebSocket 생성자 명시적 지정
-// Vercel 일부 환경에서 소켓 연결 오류를 방지하기 위해 필수적입니다.
+// Neon Serverless용 WebSocket 설정 (Edge/Serverless 환경 대응)
 if (typeof window === 'undefined') {
   neonConfig.webSocketConstructor = ws;
 }
 
-// Vercel/Neon DB 연결 설정
+// 환경 변수 감지 (Vercel Postgres의 모든 케이스 대응)
 const connectionString =
   process.env.POSTGRES_URL ||
   process.env.POSTGRES_PRISMA_URL ||
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL_NON_POOLING;
 
-// Vercel Postgres의 'prisma+postgres://' 형식을 'postgres://'로 변환 (Neon 드라이버 호환성)
+// prisma+ 가 붙은 경우 순수 postgres:// 로 변환
 let sanitizedUrl = connectionString;
 if (sanitizedUrl?.startsWith('prisma+postgres://')) {
   sanitizedUrl = sanitizedUrl.replace('prisma+postgres://', 'postgres://');
 }
 
-// 디버깅을 위한 서버 로그
-if (typeof window === 'undefined') {
-  if (sanitizedUrl) {
-    console.log(`[DB] Connection attempt with sanitized URL: ${sanitizedUrl.substring(0, 25)}...`);
-  } else {
-    console.error('[DB] CRITICAL: No database connection string found in environment variables!');
-  }
-}
-
-const pool = new Pool({
+// Pool 생성
+export const pool = new Pool({
   connectionString: sanitizedUrl,
 });
 
+// 사용자가 요청한 'db.query' 문법 대응을 위한 객체 수출
+export const db = {
+  query: (text: string, params?: any[]) => pool.query(text, params),
+};
+
 /**
- * 데이터베이스 테이블이 없을 경우 자동으로 생성합니다.
+ * 테이블 자동 생성 함수 (가장 안전한 기본 쿼리)
  */
 export async function initializeDatabase() {
-  console.log('[DB] Initializing database tables...');
+  if (typeof window !== 'undefined') return;
+
   try {
-    // 1. users 테이블
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(255) UNIQUE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
-    // 2. study_sessions 테이블
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS study_sessions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID REFERENCES users(id),
+        user_id UUID,
         date DATE NOT NULL,
         score INTEGER,
         total_count INTEGER,
@@ -60,62 +55,10 @@ export async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-
-    // 3. problem_logs 테이블
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS problem_logs (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        session_id UUID REFERENCES study_sessions(id),
-        topic VARCHAR(100),
-        is_correct BOOLEAN,
-        time_spent INTEGER
-      );
-    `);
-
-    console.log('[DB] Database tables initialized successfully.');
+    console.log('[DB] Tables checked/created.');
   } catch (error) {
-    console.error('[DB] Failed to initialize database tables:', error);
-    throw error;
+    console.error('[DB] Init Error:', error);
   }
 }
 
 export default pool;
-
-// 헬퍼 함수들 (이전과 동일한 인터페이스 유지 노력)
-
-export async function getUserByName(name: string) {
-  const { rows } = await pool.query('SELECT * FROM users WHERE name = $1 LIMIT 1', [name]);
-  return rows[0];
-}
-
-export async function createUser(name: string) {
-  const { rows } = await pool.query(
-    'INSERT INTO users (name) VALUES ($1) RETURNING *',
-    [name]
-  );
-  return rows[0];
-}
-
-export async function getRecentSessions(userId: string, limit = 30) {
-  const { rows } = await pool.query(
-    'SELECT * FROM study_sessions WHERE user_id = $1 ORDER BY date DESC LIMIT $2',
-    [userId, limit]
-  );
-  return rows;
-}
-
-export async function saveSession(userId: string, date: string, score: number, totalCount: number, level: string) {
-  const { rows } = await pool.query(
-    'INSERT INTO study_sessions (user_id, date, score, total_count, level) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-    [userId, date, score, totalCount, level]
-  );
-  return rows[0];
-}
-
-export async function getRecentAverageScore(userId: string, limit = 5) {
-  const { rows } = await pool.query(
-    'SELECT AVG(score) as avg_score FROM study_sessions WHERE user_id = $1 ORDER BY date DESC LIMIT $2',
-    [userId, limit]
-  );
-  return rows[0]?.avg_score ? parseFloat(rows[0].avg_score) : null;
-}
