@@ -107,13 +107,23 @@ export async function POST(request: NextRequest) {
         schoolLevel = 'elementary',
         grade = 3,
         unitId,
+        level = 'medium', // easy, medium, hard
     } = body;
 
-    console.log(`📡 /api/generate — count=${count}, level=${schoolLevel}, grade=${grade}, unitId=${unitId}`);
+    console.log(`📡 /api/generate — count=${count}, level=${schoolLevel} ${grade}, unitId=${unitId}, difficulty=${level}`);
 
     // 3. OpenAI 호출
     const client = new OpenAI({ apiKey });
-    const systemPrompt = buildSystemPrompt(schoolLevel, grade);
+    let systemPrompt = buildSystemPrompt(schoolLevel, grade);
+
+    // 난이도별 프롬프트 조정
+    if (level === 'easy') {
+        systemPrompt += `\n\n[난이도: 기초(Easy)]\n학생이 기초가 부족합니다. 교과서 예제 수준의 **아주 기본적인 개념 확인 문제** 위주로 출제하세요. 복잡한 응용은 피하고, 자신감을 길러주는 데 집중하세요.`;
+    } else if (level === 'hard') {
+        systemPrompt += `\n\n[난이도: 심화(Hard)]\n학생이 매우 우수합니다. **경시대회(Olympiad) 스타일의 사고력 문제**를 출제하세요. 단순 계산보다는 창의적인 발상이 필요하거나, 함정이 있는 문제를 포함하세요.`;
+    } else {
+        systemPrompt += `\n\n[난이도: 보통(Medium)]\n현행 교과 과정의 표준 난이도입니다. 개념 이해와 기본 응용력을 골고루 평가하세요.`;
+    }
 
     // 문제 생성 계획 (단순화: Python 버전의 plan_daily_worksheet 로직 간소화)
     const plan = Array.from({ length: Math.min(count, 15) }, (_, i) => ({

@@ -22,16 +22,11 @@ const getApiBaseUrl = () => {
     return 'http://localhost:8000';
 };
 
-// 커리큘럼 조회 API (Python 백엔드 전용 — 로컬에서만 작동)
+// 커리큘럼 조회 API (Next.js API Route 사용 — Vercel/Local 모두 호환)
 export async function fetchCurriculum(schoolLevel: string, grade: number): Promise<Chapter[]> {
     try {
-        // Vercel에서는 커리큘럼 API 없음 → 빈 배열 반환
-        if (isVercelOrProduction()) {
-            console.log('📡 Vercel 환경: 커리큘럼 API 미지원, 빈 배열 반환');
-            return [];
-        }
-
-        const url = `${getApiBaseUrl()}/api/curriculum/${schoolLevel}/${grade}`;
+        // Vercel/Local 모두 Next.js API Route 사용
+        const url = `/api/curriculum/${schoolLevel}/${grade}`;
         console.log(`📡 Fetching Curriculum: ${url}`);
 
         const response = await fetch(url);
@@ -42,7 +37,7 @@ export async function fetchCurriculum(schoolLevel: string, grade: number): Promi
         }
 
         const data = await response.json();
-        console.log(`✅ Curriculum Data Correctly Fetched: ${data.length} items`);
+        console.log(`✅ Curriculum Data Fetched: ${data.length} chapters`);
 
         return data;
     } catch (e) {
