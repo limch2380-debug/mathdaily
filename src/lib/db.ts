@@ -1,50 +1,52 @@
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import ws from 'ws';
 
-// Neon Serverless용 WebSocket 설정 (Edge/Serverless 환경 대응)
+// Neon Serverless 전용 설정: WebSocket 강제 사용으로 HTTP 404 오류 방지
 if (typeof window === 'undefined') {
   neonConfig.webSocketConstructor = ws;
 }
 
-// 환경 변수 감지 (Vercel Postgres의 모든 케이스 대응)
-const connectionString =
-  process.env.POSTGRES_URL ||
-  process.env.DATABASE_URL ||
-  process.env.POSTGRES_PRISMA_URL ||
-  process.env.POSTGRES_URL_NON_POOLING;
+const getSanitizedUrl = () => {
+  let url = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
 
-// prisma+ 가 붙은 경우 순수 postgres:// 로 변환
-let sanitizedUrl = connectionString;
-if (sanitizedUrl?.startsWith('prisma+postgres://')) {
-  sanitizedUrl = sanitizedUrl.replace('prisma+postgres://', 'postgres://');
-}
+  if (!url) return null;
 
-// Pool 생성 (SSL 설정 최적화)
+  // 1. prisma+postgres:// -> postgres:// 변환
+  if (url.startsWith('prisma+')) {
+    url = url.replace('prisma+', '');
+  }
+
+  // 2. URL 파싱 및 정리 (Neon 드라이버는 표준 형식을 선호함)
+  try {
+    const urlObj = new URL(url);
+    return urlObj.toString();
+  } catch (e) {
+    return url;
+  }
+};
+
+const sanitizedUrl = getSanitizedUrl();
+
 export const pool = new Pool({
   connectionString: sanitizedUrl || '',
-  ssl: sanitizedUrl?.includes('localhost') ? false : { rejectUnauthorized: false },
+  // Vercel/Neon 환경에서는 rejectUnauthorized: false가 가장 안정적입니다.
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10000,
 });
 
-// 사용자가 요청한 'db.query' 문법 대응을 위한 객체 수출
 export const db = {
   query: (text: string, params?: any[]) => pool.query(text, params),
 };
 
-/**
- * 테이블 자동 생성 함수 (가장 안전한 기본 쿼리)
- */
 export async function initializeDatabase() {
   if (typeof window !== 'undefined') return;
-
-  if (!sanitizedUrl) {
-    throw new Error('데이터베이스 연결 문자열(DATABASE_URL 또는 POSTGRES_URL)이 환경 변수에 설정되지 않았습니다.');
-  }
+  if (!sanitizedUrl) throw new Error('환경 변수에서 DATABASE_URL을 찾을 수 없습니다.');
 
   try {
-    // 1. UUID 생성을 위해 필요한 확장 기능 설치
+    // 1. UUID 확장을 먼저 생성
     await db.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
-    // 2. users 테이블
+    // 2. 테이블 생성
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,7 +55,6 @@ export async function initializeDatabase() {
       );
     `);
 
-    // 3. study_sessions 테이블
     await db.query(`
       CREATE TABLE IF NOT EXISTS study_sessions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -67,7 +68,7 @@ export async function initializeDatabase() {
     `);
     console.log('[DB] Initialization Success');
   } catch (error: any) {
-    console.error('[DB] Initialization Error Details:', error);
+    console.error('[DB] Init Error:', error.message);
     throw error;
   }
 }
