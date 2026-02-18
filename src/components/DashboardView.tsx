@@ -59,7 +59,17 @@ export default function DashboardView({ user, settings, onSettingsChange, onStar
 
     // 설정 변경 핸들러
     const handleChange = (key: keyof UserSettings, value: any) => {
-        onSettingsChange({ ...settings, [key]: value });
+        let newSettings = { ...settings, [key]: value };
+
+        // 학교급 변경 시 학년 범위 체크 및 조정
+        if (key === 'schoolLevel') {
+            const maxGrade = value === 'elementary' ? 6 : 3;
+            if (settings.grade > maxGrade) {
+                newSettings.grade = 1; // 초등 6학년에서 중등 선택 시 1학년으로 리셋
+            }
+        }
+
+        onSettingsChange(newSettings);
     };
 
     return (
@@ -202,8 +212,10 @@ export default function DashboardView({ user, settings, onSettingsChange, onStar
                                     outline: 'none'
                                 }}
                             >
-                                {[1, 2, 3, 4, 5, 6].map(g => (
-                                    <option key={g} value={g} style={{ background: 'var(--bg-secondary)' }}>{g}학년</option>
+                                {Array.from({ length: settings.schoolLevel === 'elementary' ? 6 : 3 }).map((_, i) => (
+                                    <option key={i + 1} value={i + 1} style={{ background: 'var(--bg-secondary)' }}>
+                                        {i + 1}학년
+                                    </option>
                                 ))}
                             </select>
                         </div>
