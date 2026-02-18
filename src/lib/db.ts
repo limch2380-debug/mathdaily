@@ -40,9 +40,15 @@ export const db = {
 
 export async function initializeDatabase() {
   if (typeof window !== 'undefined') return;
-  if (!sanitizedUrl) throw new Error('환경 변수에서 DATABASE_URL을 찾을 수 없습니다.');
+
+  if (!sanitizedUrl) {
+    console.error('[DB] Missing connection string!');
+    throw new Error('환경 변수에서 DATABASE_URL을 찾을 수 없습니다.');
+  }
 
   try {
+    console.debug('[DB] Initialization started...');
+
     // 1. UUID 확장을 먼저 생성
     await db.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
@@ -68,7 +74,7 @@ export async function initializeDatabase() {
     `);
     console.log('[DB] Initialization Success');
   } catch (error: any) {
-    console.error('[DB] Init Error:', error.message);
+    console.error('[DB] Initialization Failed:', error.message);
     throw error;
   }
 }
