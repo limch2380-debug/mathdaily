@@ -93,9 +93,9 @@ export interface Worksheet {
 }
 
 export interface UserResponseData {
-    id: string;
-    userId: string;
-    worksheetId: string;
+    id?: string;
+    userId?: string;
+    worksheetId?: string;
     problemId: string;
     userAnswer: string;
     isCorrect: boolean;

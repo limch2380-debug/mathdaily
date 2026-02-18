@@ -108,13 +108,19 @@ export async function POST(request: NextRequest) {
         grade = 3,
         unitId,
         level = 'medium', // easy, medium, hard
+        topics = [], // 유사 문제 생성 시 주제 필터
     } = body;
 
-    console.log(`📡 /api/generate — count=${count}, level=${schoolLevel} ${grade}, unitId=${unitId}, difficulty=${level}`);
+    console.log(`📡 /api/generate — count=${count}, level=${schoolLevel} ${grade}, topics=${topics.join(', ')}, difficulty=${level}`);
 
     // 3. OpenAI 호출
     const client = new OpenAI({ apiKey });
     let systemPrompt = buildSystemPrompt(schoolLevel, grade);
+
+    // 유사 문제 가중치 추가
+    if (topics.length > 0) {
+        systemPrompt += `\n\n[특별 지침: 유사 문제 생성]\n다음 주제들에 집중하여 문제를 출제하세요: ${topics.join(', ')}. 해당 개념의 유사 변형 문제를 만들어 학습을 돕습니다.`;
+    }
 
     // 난이도별 프롬프트 조정
     if (level === 'easy') {
@@ -126,12 +132,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 문제 생성 계획 (단순화: Python 버전의 plan_daily_worksheet 로직 간소화)
-    const plan = Array.from({ length: Math.min(count, 15) }, (_, i) => ({
+    const planCount = Math.min(count, 15);
+    const plan = Array.from({ length: planCount }, (_, i) => ({
         index: i + 1,
-        difficulty: i < count * 0.3 ? 1 : i < count * 0.7 ? 2 : 3,
+        difficulty: i < planCount * 0.3 ? 1 : i < planCount * 0.7 ? 2 : 3,
+        topic: topics.length > 0 ? topics[i % topics.length] : undefined
     }));
 
-    const userPrompt = `다음 계획에 맞춰 총 ${plan.length}개의 수학 문제를 생성해줘:\n${JSON.stringify(plan, null, 2)}`;
+    const userPrompt = topics.length > 0
+        ? `주체별(${topics.join(', ')})로 균형 있게 총 ${plan.length}개의 유사 변형 문제를 생성해줘.`
+        : `다음 계획에 맞춰 총 ${plan.length}개의 수학 문제를 생성해줘:\n${JSON.stringify(plan, null, 2)}`;
 
     try {
         const response = await client.chat.completions.create({
