@@ -1,47 +1,38 @@
 import { neon, neonConfig } from '@neondatabase/serverless';
 
 const getSanitizedUrl = () => {
-  // Vercel Postgres의 다양한 변수명 대응 (POSTGRES_URL이 우선순위)
   const url = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
-
   if (!url) return null;
 
   try {
     // 1. prisma+ 접두사 제거
-    let cleanUrl = url.replace('prisma+', '');
+    let cleanUrl = url.trim().replace('prisma+', '');
 
-    // 2. URL 객체를 이용한 정밀 세척
-    const urlObj = new URL(cleanUrl);
-
-    // 3. 쿼리 파라미터(?sslmode=... 등)는 HTTP 드라이버를 혼란스럽게 하므로 완전 제거
-    urlObj.search = "";
-
-    // 4. Neon HTTP 드라이버는 pooler 호스트보다 direct 호스트를 선호함
-    // 호스트명에 -pooler 가 있다면 제거 (예: ep-xxx-pooler.region -> ep-xxx.region)
-    if (urlObj.hostname.includes('-pooler')) {
-      urlObj.hostname = urlObj.hostname.replace('-pooler', '');
+    // 2. 쿼리 파라미터(?...) 제거
+    if (cleanUrl.includes('?')) {
+      cleanUrl = cleanUrl.split('?')[0];
     }
 
-    const finalUrl = urlObj.toString();
-    console.log('[DB] Attempting connection to host:', urlObj.hostname);
-    return finalUrl;
+    // 마스킹된 로그 (Vercel 로그에서 확인 가능)
+    try {
+      const u = new URL(cleanUrl);
+      console.log(`[DB] Connecting to: ${u.protocol}//${u.username}:***@${u.host}${u.pathname}`);
+    } catch (e) { }
+
+    return cleanUrl;
   } catch (e) {
-    console.warn('[DB] URL parsing failed, using raw string');
     return url;
   }
 };
 
-// SQL 실행 함수 (싱글톤 패턴으로 필요할 때 초기화)
+// SQL 실행 함수 (싱글톤 패턴)
 let sqlClient: any = null;
 
 const getSql = () => {
   if (sqlClient) return sqlClient;
 
   const url = getSanitizedUrl();
-  // URL이 유효한 형식(postgres://)인지 한 번 더 체크
-  if (!url || !url.startsWith('postgres')) {
-    return null;
-  }
+  if (!url) return null;
 
   try {
     sqlClient = neon(url);
