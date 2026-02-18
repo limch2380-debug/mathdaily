@@ -61,7 +61,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          count: 10,
+          count: userSettings.problemCount,
           schoolLevel: userSettings.schoolLevel,
           grade: userSettings.grade,
           level: level // ★ 레벨 전달
@@ -171,7 +171,12 @@ export default function Home() {
 
   return (
     <>
-      <DashboardView user={user} onStartStudy={handleStartStudy} />
+      <DashboardView
+        user={user}
+        settings={userSettings}
+        onSettingsChange={setUserSettings}
+        onStartStudy={handleStartStudy}
+      />
       {isLoading && <LoadingOverlay message={loadingMessage} />}
     </>
   );

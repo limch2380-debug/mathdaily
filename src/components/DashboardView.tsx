@@ -3,13 +3,16 @@
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { UserSettings } from '@/lib/types';
 
 interface DashboardProps {
     user: { id: string; name: string };
+    settings: UserSettings;
+    onSettingsChange: (settings: UserSettings) => void;
     onStartStudy: (level: string) => void;
 }
 
-export default function DashboardView({ user, onStartStudy }: DashboardProps) {
+export default function DashboardView({ user, settings, onSettingsChange, onStartStudy }: DashboardProps) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -53,26 +56,13 @@ export default function DashboardView({ user, onStartStudy }: DashboardProps) {
 
     const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
 
-    const levelLabel = (level: string) => {
-        if (level === 'hard') return '심화 (상)';
-        if (level === 'easy') return '기초 (하)';
-        return '보통 (중)';
-    };
-
-    const levelColor = (level: string) => {
-        if (level === 'hard') return 'var(--accent-red)';
-        if (level === 'easy') return 'var(--accent-green)';
-        return 'var(--accent-amber)';
-    };
-
-    const scoreColor = (score: number) => {
-        if (score >= 80) return 'score-high';
-        if (score >= 50) return 'score-mid';
-        return 'score-low';
+    // 설정 변경 핸들러
+    const handleChange = (key: keyof UserSettings, value: any) => {
+        onSettingsChange({ ...settings, [key]: value });
     };
 
     return (
-        <div className="app-container" style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div className="app-container" style={{ maxWidth: '1000px', margin: '0 auto' }}>
             {/* 헤더 */}
             <header className="header" style={{ marginBottom: '32px' }}>
                 <div className="header-logo">
@@ -84,144 +74,174 @@ export default function DashboardView({ user, onStartStudy }: DashboardProps) {
                 </div>
                 <button
                     className="start-btn"
-                    onClick={() => onStartStudy(safeStats.currentLevel)}
+                    onClick={() => onStartStudy(settings.difficulty || safeStats.currentLevel)}
                     style={{ padding: '14px 32px', borderRadius: '16px', fontSize: '16px' }}
                 >
                     🚀 오늘의 문제 풀기
                 </button>
             </header>
 
-            {/* 학습 통계 카드 3개 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
-                <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
-                    <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
-                        📅 총 학습일
-                    </div>
-                    <div style={{
-                        fontSize: '36px', fontWeight: 900,
-                        fontFamily: 'var(--font-mono)',
-                        background: 'var(--gradient-primary)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent'
-                    }}>
-                        {safeStats.totalDays || 0}
-                    </div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>일</div>
-                </div>
-
-                <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
-                    <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
-                        📊 평균 점수
-                    </div>
-                    <div style={{
-                        fontSize: '36px', fontWeight: 900,
-                        fontFamily: 'var(--font-mono)',
-                        background: 'linear-gradient(135deg, #10b981, #34d399)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent'
-                    }}>
-                        {safeStats.avgScore || 0}
-                    </div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>점</div>
-                </div>
-
-                <div className="card" style={{ textAlign: 'center', padding: '24px 16px' }}>
-                    <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>
-                        🎯 현재 레벨
-                    </div>
-                    <div style={{
-                        fontSize: '22px', fontWeight: 800,
-                        color: levelColor(safeStats.currentLevel),
-                        marginTop: '8px'
-                    }}>
-                        {levelLabel(safeStats.currentLevel)}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
-                        AI 자동 조절
-                    </div>
-                </div>
-            </div>
-
-            {/* 학습 캘린더 */}
-            <div className="card" style={{ padding: '28px' }}>
-                <div className="card-header">
-                    <div className="card-title">
-                        <div className="card-title-icon blue">📆</div>
-                        학습 캘린더
-                    </div>
-                </div>
-
-                {/* 월 네비게이션 */}
-                <div className="calendar-nav" style={{ justifyContent: 'center', marginBottom: '20px' }}>
-                    <button className="calendar-nav-btn" onClick={prevMonth}>◀</button>
-                    <span className="calendar-month-label">
-                        {format(currentDate, 'yyyy년 M월', { locale: ko })}
-                    </span>
-                    <button className="calendar-nav-btn" onClick={nextMonth}>▶</button>
-                </div>
-
-                {/* 요일 헤더 */}
-                <div className="calendar-grid" style={{ marginBottom: '8px' }}>
-                    {dayNames.map(d => (
-                        <div key={d} className="calendar-day-header" style={{
-                            color: d === '일' ? 'var(--accent-red)' : d === '토' ? 'var(--accent-blue)' : 'var(--text-muted)'
-                        }}>
-                            {d}
-                        </div>
-                    ))}
-                </div>
-
-                {/* 날짜 그리드 */}
-                <div className="calendar-grid">
-                    {/* 빈 칸 */}
-                    {Array.from({ length: firstDay }).map((_, i) => (
-                        <div key={`empty-${i}`} className="calendar-day empty" />
-                    ))}
-
-                    {/* 날짜들 */}
-                    {Array.from({ length: daysInMonth }).map((_, i) => {
-                        const day = i + 1;
-                        const session = getSessionForDate(day);
-                        const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
-                        const isSunday = new Date(year, month, day).getDay() === 0;
-                        const isSaturday = new Date(year, month, day).getDay() === 6;
-
-                        return (
-                            <div
-                                key={day}
-                                className={`calendar-day ${isToday ? 'today' : ''} ${session ? 'completed' : ''}`}
-                                style={{ minHeight: '64px' }}
-                            >
-                                <span className="calendar-day-num" style={{
-                                    color: isToday ? 'var(--accent-blue)' :
-                                        isSunday ? 'var(--accent-red)' :
-                                            isSaturday ? 'var(--accent-blue)' : 'var(--text-primary)',
-                                    fontSize: '15px'
-                                }}>
-                                    {day}
-                                </span>
-                                {session && (
-                                    <>
-                                        <span className="calendar-day-stamp">✅</span>
-                                        <span className={`calendar-day-score ${scoreColor(session.score)}`}>
-                                            {session.score}점
-                                        </span>
-                                    </>
-                                )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px' }}>
+                {/* 왼쪽 영역: 통계 및 캘린더 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                    {/* 학습 통계 카드 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                        <div className="card" style={{ textAlign: 'center', padding: '20px 12px' }}>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>📅 총 학습일</div>
+                            <div style={{ fontSize: '28px', fontWeight: 900, fontFamily: 'var(--font-mono)', background: 'var(--gradient-primary)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                                {safeStats.totalDays || 0}
                             </div>
-                        );
-                    })}
-                </div>
-            </div>
+                        </div>
+                        <div className="card" style={{ textAlign: 'center', padding: '20px 12px' }}>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>📊 평균 점수</div>
+                            <div style={{ fontSize: '28px', fontWeight: 900, fontFamily: 'var(--font-mono)', background: 'linear-gradient(135deg, #10b981, #34d399)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                                {safeStats.avgScore || 0}
+                            </div>
+                        </div>
+                        <div className="card" style={{ textAlign: 'center', padding: '20px 12px' }}>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>🎯 AI 추천 레벨</div>
+                            <div style={{ fontSize: '16px', fontWeight: 800, color: safeStats.currentLevel === 'hard' ? 'var(--accent-red)' : safeStats.currentLevel === 'easy' ? 'var(--accent-green)' : 'var(--accent-amber)', marginTop: '8px' }}>
+                                {safeStats.currentLevel === 'hard' ? '심화 (상)' : safeStats.currentLevel === 'easy' ? '기초 (하)' : '보통 (중)'}
+                            </div>
+                        </div>
+                    </div>
 
-            {/* 하단 안내 문구 */}
-            <div style={{
-                textAlign: 'center',
-                padding: '24px',
-                color: 'var(--text-muted)',
-                fontSize: '13px'
-            }}>
-                최근 5회 평균 점수를 기반으로 AI가 난이도를 자동 조절합니다.
+                    {/* 학습 캘린더 */}
+                    <div className="card" style={{ padding: '24px' }}>
+                        <div className="calendar-nav" style={{ justifyContent: 'center', marginBottom: '20px' }}>
+                            <button className="calendar-nav-btn" onClick={prevMonth}>◀</button>
+                            <span className="calendar-month-label">{format(currentDate, 'yyyy년 M월', { locale: ko })}</span>
+                            <button className="calendar-nav-btn" onClick={nextMonth}>▶</button>
+                        </div>
+                        <div className="calendar-grid" style={{ marginBottom: '8px' }}>
+                            {dayNames.map(d => (
+                                <div key={d} className="calendar-day-header" style={{ color: d === '일' ? 'var(--accent-red)' : d === '토' ? 'var(--accent-blue)' : 'var(--text-muted)' }}>{d}</div>
+                            ))}
+                        </div>
+                        <div className="calendar-grid">
+                            {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} className="calendar-day empty" />)}
+                            {Array.from({ length: daysInMonth }).map((_, i) => {
+                                const day = i + 1;
+                                const session = getSessionForDate(day);
+                                const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+                                return (
+                                    <div key={day} className={`calendar-day ${isToday ? 'today' : ''} ${session ? 'completed' : ''}`} style={{ minHeight: '50px' }}>
+                                        <span className="calendar-day-num" style={{ fontSize: '14px' }}>{day}</span>
+                                        {session && <span className="calendar-day-score" style={{ fontSize: '8px', padding: '1px 3px' }}>{session.score}점</span>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* 오른쪽 영역: 학습 환경 설정 */}
+                <div className="card" style={{ padding: '24px', position: 'sticky', top: '24px' }}>
+                    <div className="card-title" style={{ marginBottom: '24px' }}>
+                        <div className="card-title-icon purple">⚙️</div>
+                        학습 환경 설정
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* 1. 학교 급 */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>학교급</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                                {['elementary', 'middle', 'high'].map((level) => (
+                                    <button
+                                        key={level}
+                                        onClick={() => handleChange('schoolLevel', level)}
+                                        style={{
+                                            padding: '8px',
+                                            borderRadius: '8px',
+                                            border: '1px solid ' + (settings.schoolLevel === level ? 'var(--accent-blue)' : 'var(--border-subtle)'),
+                                            background: settings.schoolLevel === level ? 'var(--accent-blue-glow)' : 'var(--bg-glass)',
+                                            color: settings.schoolLevel === level ? 'var(--text-primary)' : 'var(--text-muted)',
+                                            fontSize: '12px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {level === 'elementary' ? '초등' : level === 'middle' ? '중등' : '고등'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 2. 학년 */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>학년</label>
+                            <select
+                                value={settings.grade}
+                                onChange={(e) => handleChange('grade', parseInt(e.target.value))}
+                                style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    borderRadius: '10px',
+                                    border: '1px solid var(--border-subtle)',
+                                    background: 'var(--bg-glass-strong)',
+                                    color: 'var(--text-primary)',
+                                    outline: 'none'
+                                }}
+                            >
+                                {[1, 2, 3, 4, 5, 6].map(g => (
+                                    <option key={g} value={g} style={{ background: 'var(--bg-secondary)' }}>{g}학년</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* 3. 난이도 */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>난이도 (AI 추천 포함)</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                                {['easy', 'medium', 'hard'].map((diff) => (
+                                    <button
+                                        key={diff}
+                                        onClick={() => handleChange('difficulty', diff)}
+                                        style={{
+                                            padding: '8px',
+                                            borderRadius: '8px',
+                                            border: '1px solid ' + (settings.difficulty === diff ? 'var(--accent-amber)' : 'var(--border-subtle)'),
+                                            background: settings.difficulty === diff ? 'var(--accent-amber-glow)' : 'var(--bg-glass)',
+                                            color: settings.difficulty === diff ? 'var(--text-primary)' : 'var(--text-muted)',
+                                            fontSize: '12px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {diff === 'easy' ? '기초' : diff === 'medium' ? '보통' : '심화'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 4. 문제 수 */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>문제 수</label>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                                {[10, 20, 30].map((count) => (
+                                    <button
+                                        key={count}
+                                        onClick={() => handleChange('problemCount', count)}
+                                        style={{
+                                            padding: '10px',
+                                            borderRadius: '8px',
+                                            border: '1px solid ' + (settings.problemCount === count ? 'var(--accent-purple)' : 'var(--border-subtle)'),
+                                            background: settings.problemCount === count ? 'var(--accent-purple-glow)' : 'var(--bg-glass)',
+                                            color: settings.problemCount === count ? 'var(--text-primary)' : 'var(--text-muted)',
+                                            fontSize: '13px',
+                                            fontWeight: 800,
+                                            fontFamily: 'var(--font-mono)',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {count}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
