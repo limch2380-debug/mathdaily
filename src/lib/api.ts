@@ -1,20 +1,36 @@
 import { ProblemData, Chapter } from './types';
 
-// Backend API address detection
+// ============================================
+// API 엔드포인트 자동 감지
+// Vercel 배포: /api/generate (Next.js API Route)
+// 로컬 개발: Python 백엔드 (port 8000)
+// ============================================
+const isVercelOrProduction = () => {
+    if (typeof window === 'undefined') return false;
+    const hostname = window.location.hostname;
+    // localhost 이면 로컬, 아니면 Vercel/배포 환경
+    return hostname !== 'localhost' && hostname !== '127.0.0.1';
+};
+
 const getApiBaseUrl = () => {
     if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
         const protocol = window.location.protocol;
-        // If accessed via IP or other hostname, point to port 8000 on that same host
         const url = `${protocol}//${hostname}:8000`;
         return url;
     }
     return 'http://localhost:8000';
 };
 
-// 커리큘럼 조회 API
+// 커리큘럼 조회 API (Python 백엔드 전용 — 로컬에서만 작동)
 export async function fetchCurriculum(schoolLevel: string, grade: number): Promise<Chapter[]> {
     try {
+        // Vercel에서는 커리큘럼 API 없음 → 빈 배열 반환
+        if (isVercelOrProduction()) {
+            console.log('📡 Vercel 환경: 커리큘럼 API 미지원, 빈 배열 반환');
+            return [];
+        }
+
         const url = `${getApiBaseUrl()}/api/curriculum/${schoolLevel}/${grade}`;
         console.log(`📡 Fetching Curriculum: ${url}`);
 
@@ -28,10 +44,6 @@ export async function fetchCurriculum(schoolLevel: string, grade: number): Promi
         const data = await response.json();
         console.log(`✅ Curriculum Data Correctly Fetched: ${data.length} items`);
 
-        if (data.length === 0) {
-            console.warn(`⚠️ Warning: No curriculum data found for ${schoolLevel} grade ${grade}`);
-        }
-
         return data;
     } catch (e) {
         console.error("🔥 Curriculum Fetch Exception:", e);
@@ -39,70 +51,102 @@ export async function fetchCurriculum(schoolLevel: string, grade: number): Promi
     }
 }
 
-// AI 학습지 생성 API (단원 선택 지원)
-export async function fetchAIWorksheet(userId: string, count: number = 10, unitId?: number, schoolLevel?: string, grade?: number): Promise<ProblemData[]> {
-    try {
-        // AI 호출 전 로그 추가
-        console.log(`🚀 Requesting AI Worksheet: ${userId}, level=${schoolLevel} ${grade}, count=${count}, unitId=${unitId}`);
+// ============================================
+// AI 학습지 생성 API
+// Vercel: /api/generate (Next.js API Route)
+// 로컬:  Python 백엔드 /api/daily-worksheet/generate
+// ============================================
+export async function fetchAIWorksheet(
+    userId: string,
+    count: number = 10,
+    unitId?: number,
+    schoolLevel?: string,
+    grade?: number
+): Promise<ProblemData[]> {
+    const useVercelApi = isVercelOrProduction();
 
-        const response = await fetch(`${getApiBaseUrl()}/api/daily-worksheet/generate`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                userId,
-                count,
-                unitId, // 단원 선택 시 전달 (집중 훈련)
-                schoolLevel,
-                grade
-            }),
-        });
+    try {
+        console.log(`🚀 Requesting AI Worksheet: ${userId}, level=${schoolLevel} ${grade}, count=${count}, unitId=${unitId}`);
+        console.log(`📡 Using ${useVercelApi ? 'Vercel /api/generate' : 'Python backend'}`);
+
+        let response: Response;
+
+        if (useVercelApi) {
+            // ★ Vercel: Next.js API Route 사용
+            response = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    count,
+                    unitId,
+                    schoolLevel: schoolLevel || 'elementary',
+                    grade: grade || 3,
+                }),
+            });
+        } else {
+            // ★ 로컬: Python 백엔드 사용
+            response = await fetch(`${getApiBaseUrl()}/api/daily-worksheet/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, count, unitId, schoolLevel, grade }),
+            });
+        }
 
         console.log(`✅ Backend Response Status: ${response.status} ${response.statusText}`);
 
-        // 에러 상태 코드 처리 (과금, 인증 등)
+        // 에러 상태 코드 처리
         if (!response.ok) {
-            if (response.status === 429) throw new Error("QUOTA_EXCEEDED");
-            if (response.status === 401) throw new Error("AUTH_ERROR");
-
-            // 500 에러 등의 경우 백엔드 에러 메시지도 확인
-            let errorDetail = "";
+            // 상세 에러 로깅 (F12 콘솔에서 확인 가능)
+            let errorDetail = '';
             try {
                 const errorData = await response.json();
                 errorDetail = JSON.stringify(errorData);
-            } catch (e) { }
+                console.error(`❌ API Error Detail: ${errorDetail}`);
+            } catch { /* 무시 */ }
 
-            throw new Error(`Failed to fetch AI worksheet: ${response.statusText} (${errorDetail})`);
+            if (response.status === 401) {
+                console.error('❌ 401 Unauthorized — API 키가 잘못되었거나 만료되었습니다.');
+                throw new Error('AUTH_ERROR');
+            }
+            if (response.status === 429) {
+                console.error('❌ 429 Rate Limit — API 사용량이 초과되었습니다.');
+                throw new Error('QUOTA_EXCEEDED');
+            }
+            if (response.status === 404) {
+                console.error('❌ 404 Not Found — API 엔드포인트를 찾을 수 없습니다.');
+            }
+
+            throw new Error(`Failed to fetch AI worksheet: ${response.status} ${response.statusText} (${errorDetail})`);
         }
 
         const data = await response.json();
 
-        // 데이터가 비었는지 확인
         if (!data || data.length === 0) {
-            console.warn("⚠️ AI returned empty problem list. Falling back to local generation required.");
+            console.warn('⚠️ AI returned empty problem list.');
             return [];
         }
 
         console.log(`✅ Received ${data.length} AI-generated problems.`);
 
-        // API 응답을 ProblemData 형식으로 변환 (숫자형 난이도를 문자열로)
+        // API 응답을 ProblemData 형식으로 변환
         return data.map((p: any) => ({
             question: p.question,
             answer: p.answer,
             topic: p.topic,
             type: p.type,
-            difficulty: p.difficulty === 3 ? 'hard' : p.difficulty === 2 ? 'medium' : 'easy',
+            difficulty: typeof p.difficulty === 'number'
+                ? (p.difficulty === 3 ? 'hard' : p.difficulty === 2 ? 'medium' : 'easy')
+                : p.difficulty,
             options: p.options,
             explanation: p.explanation,
+            svg: p.svg,
         }));
     } catch (error: any) {
         console.error('🔥 AI API Fatal Error:', error);
-        // 치명적 에러는 상위로 전파하여 UI 표시
-        if (error.message === "QUOTA_EXCEEDED" || error.message === "AUTH_ERROR") {
+
+        if (error.message === 'QUOTA_EXCEEDED' || error.message === 'AUTH_ERROR') {
             throw error;
         }
-        // 그 외 일반 에러(타임아웃, 서버 오류 등)는 빈 배열 반환 -> 로컬 백업 사용
         return [];
     }
 }
