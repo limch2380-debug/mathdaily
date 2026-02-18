@@ -28,17 +28,31 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(newRows[0]);
         } catch (dbError: any) {
             console.error('DB Error details:', dbError);
-            // 구체적인 에러 메시지 반환 (테이블 부재, 연결 실패 등)
-            let detailedError = `데이터베이스 오류가 발생했습니다: ${dbError.message}`;
+
+            // 클라이언트에 전달할 상세 에러 정보 구성
+            const errorResponse = {
+                error: `데이터베이스 오류: ${dbError.message}`,
+                details: {
+                    code: dbError.code,
+                    detail: dbError.detail,
+                    hint: dbError.hint,
+                    message: dbError.message
+                }
+            };
+
             if (dbError.message.includes('relation "users" does not exist')) {
-                detailedError = '데이터베이스에 "users" 테이블이 존재하지 않습니다. schema.sql을 실행해주세요.';
+                errorResponse.error = '데이터베이스에 "users" 테이블이 존재하지 않습니다. schema.sql을 실행해주세요.';
             } else if (dbError.message.includes('connection')) {
-                detailedError = '데이터베이스 연결에 실패했습니다. DATABASE_URL 설정을 확인해주세요.';
+                errorResponse.error = '데이터베이스 연결에 실패했습니다. DATABASE_URL 설정을 확인해주세요.';
             }
-            return NextResponse.json({ error: detailedError }, { status: 500 });
+
+            return NextResponse.json(errorResponse, { status: 500 });
         }
     } catch (error: any) {
         console.error('Login error:', error);
-        return NextResponse.json({ error: `로그인 처리 중 예외 발생: ${error.message}` }, { status: 500 });
+        return NextResponse.json({
+            error: `로그인 처리 중 예외 발생: ${error.message}`,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }, { status: 500 });
     }
 }

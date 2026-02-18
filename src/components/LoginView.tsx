@@ -33,6 +33,7 @@ export default function LoginView({ onLogin }: LoginViewProps) {
             const data = await response.json();
 
             if (!response.ok) {
+                console.error('[Login] Server Error Context:', data); // 상세 객체 콘솔 출력
                 throw new Error(data.error || '로그인 중 알 수 없는 오류가 발생했습니다.');
             }
 

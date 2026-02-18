@@ -1,8 +1,22 @@
 import { Pool } from '@neondatabase/serverless';
 
-// Vercel Edge/Serverless 환경을 위한 Neon Pool 설정
+// Vercel/Neon DB 연결 설정
+const connectionString =
+  process.env.POSTGRES_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
+  process.env.DATABASE_URL;
+
+// 디버깅을 위한 서버 로그 (비밀번호 등 민감 정보 제외하고 앞부분만 노출)
+if (typeof window === 'undefined') {
+  if (connectionString) {
+    console.log(`[DB] Connection string found: ${connectionString.substring(0, 15)}...`);
+  } else {
+    console.error('[DB] CRITICAL: No database connection string found in environment variables!');
+  }
+}
+
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
+  connectionString: connectionString,
 });
 
 export default pool;
