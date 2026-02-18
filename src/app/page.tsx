@@ -101,6 +101,23 @@ export default function Home() {
     }
   };
 
+  // 새로 시작하기 (로그아웃)
+  const handleLogout = () => {
+    if (confirm('모든 진행 상태를 초기화하고 새로 시작하시겠습니까?')) {
+      if (user) {
+        localStorage.removeItem('mathdaily_user');
+        localStorage.removeItem(`session_problems_${user.id}`);
+        localStorage.removeItem(`session_active_${user.id}`);
+        localStorage.removeItem(`session_responses_${user.id}`);
+        localStorage.removeItem(`session_level_${user.id}`);
+      }
+      setUser(null);
+      setShowWorksheet(false);
+      setCurrentProblems([]);
+      setUserResponses([]);
+    }
+  };
+
   // 3. 학습 시작 (대시보드에서 호출)
   const handleStartStudy = useCallback(async (level: string) => {
     setSuggestedLevel(level); // AI가 제안한 레벨 저장
@@ -295,10 +312,11 @@ export default function Home() {
   return (
     <>
       <DashboardView
-        user={user}
+        user={user!}
         settings={userSettings}
         onSettingsChange={setUserSettings}
         onStartStudy={handleStartStudy}
+        onLogout={handleLogout}
       />
       {isLoading && <LoadingOverlay message={loadingMessage} />}
     </>

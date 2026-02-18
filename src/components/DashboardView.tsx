@@ -10,9 +10,10 @@ interface DashboardProps {
     settings: UserSettings;
     onSettingsChange: (settings: UserSettings) => void;
     onStartStudy: (level: string) => void;
+    onLogout: () => void;
 }
 
-export default function DashboardView({ user, settings, onSettingsChange, onStartStudy }: DashboardProps) {
+export default function DashboardView({ user, settings, onSettingsChange, onStartStudy, onLogout }: DashboardProps) {
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -72,13 +73,30 @@ export default function DashboardView({ user, settings, onSettingsChange, onStar
                         <p>안녕하세요, {user.name}님! 👋</p>
                     </div>
                 </div>
-                <button
-                    className="start-btn"
-                    onClick={() => onStartStudy(settings.difficulty || safeStats.currentLevel)}
-                    style={{ padding: '14px 32px', borderRadius: '16px', fontSize: '16px' }}
-                >
-                    🚀 오늘의 문제 풀기
-                </button>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                    <button
+                        className="start-btn"
+                        onClick={onLogout}
+                        style={{
+                            padding: '14px 24px',
+                            borderRadius: '16px',
+                            fontSize: '15px',
+                            background: 'var(--bg-glass-strong)',
+                            border: '1px solid var(--border-medium)',
+                            color: 'var(--text-secondary)',
+                            boxShadow: 'none'
+                        }}
+                    >
+                        🔄 새로 시작하기
+                    </button>
+                    <button
+                        className="start-btn"
+                        onClick={() => onStartStudy(settings.difficulty || safeStats.currentLevel)}
+                        style={{ padding: '14px 32px', borderRadius: '16px', fontSize: '16px' }}
+                    >
+                        🚀 오늘의 문제 풀기
+                    </button>
+                </div>
             </header>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px' }}>

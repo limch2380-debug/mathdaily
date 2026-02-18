@@ -249,6 +249,15 @@ export default function WorksheetView({
                             🏠 대시보드로 가기
                         </button>
 
+                        <button className="dashboard-btn" onClick={() => {
+                            if (confirm('모든 진행 상태를 초기화하고 새로 시작하시겠습니까?')) {
+                                window.location.href = '/'; // 강제 새로고침으로 세션 초기화 유도 (또는 props로 받은 onLogout 호출 가능)
+                                localStorage.clear();
+                            }
+                        }} style={{ color: 'var(--accent-red)' }}>
+                            🔄 새로 시작하기
+                        </button>
+
                         {problems.length - correctCount > 0 && (
                             <>
                                 <button className="retry-btn" onClick={() => {
