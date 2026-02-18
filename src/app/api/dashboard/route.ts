@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import pool from '@/lib/db';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -11,17 +11,18 @@ export async function GET(request: NextRequest) {
 
     try {
         // 1. 최근 학습 세션 (30일치)
-        const { rows: sessions } = await sql`
-      SELECT * FROM study_sessions 
-      WHERE user_id = ${userId} 
-      AND date >= NOW() - INTERVAL '30 days'
-      ORDER BY date DESC
-    `;
+        const { rows: sessions } = await pool.query(
+            `SELECT * FROM study_sessions 
+       WHERE user_id = $1 
+       AND date >= NOW() - INTERVAL '30 days'
+       ORDER BY date DESC`,
+            [userId]
+        );
 
         // 2. 최근 5회 평균 점수 및 레벨 산출
         const recent5 = sessions.slice(0, 5);
         const avgScore = recent5.length > 0
-            ? recent5.reduce((sum, s) => sum + (s.score || 0), 0) / recent5.length
+            ? recent5.reduce((sum: number, s: any) => sum + (s.score || 0), 0) / recent5.length
             : 0;
 
         // 레벨 로직: 80점 이상=hard, 50점 미만=easy, 그외=medium
@@ -29,8 +30,7 @@ export async function GET(request: NextRequest) {
         if (avgScore >= 80) suggestedLevel = 'hard';
         else if (avgScore < 50) suggestedLevel = 'easy';
 
-        // 3. 취약 포인트 (오답 노트가 아직 없으므로 임시 로직)
-        // 추후 problem_logs 테이블 연동 시 실제 데이터 사용
+        // 3. 취약 포인트 (임시)
         const weakPoints = ['분수', '도형'];
 
         return NextResponse.json({

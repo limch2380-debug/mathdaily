@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import pool from '@/lib/db';
 
 export async function POST(request: NextRequest) {
     try {
@@ -11,13 +11,12 @@ export async function POST(request: NextRequest) {
         }
 
         // 세션 저장
-        const { rows } = await sql`
-      INSERT INTO study_sessions (user_id, date, score, total_count, level)
-      VALUES (${userId}, ${date}, ${score}, ${totalCount}, ${level})
-      RETURNING *
-    `;
-
-        // TODO: 오답 노트(problem_logs) 저장은 추후 구현 (Phase 3)
+        const { rows } = await pool.query(
+            `INSERT INTO study_sessions (user_id, date, score, total_count, level)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+            [userId, date, score, totalCount, level]
+        );
 
         return NextResponse.json(rows[0]);
     } catch (error) {

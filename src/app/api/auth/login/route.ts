@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import pool from '@/lib/db'; // Updated import
 
 export async function POST(request: NextRequest) {
     try {
@@ -11,19 +11,19 @@ export async function POST(request: NextRequest) {
         }
 
         // 1. 기존 유저 확인
-        const { rows } = await sql`SELECT * FROM users WHERE name = ${name} LIMIT 1`;
+        const { rows } = await pool.query('SELECT * FROM users WHERE name = $1 LIMIT 1', [name]);
 
         if (rows.length > 0) {
             return NextResponse.json(rows[0]);
         }
 
         // 2. 없으면 신규 생성
-        // gen_random_uuid()는 Postgres 13+ 내장 함수
-        const { rows: newRows } = await sql`
-      INSERT INTO users (id, name) 
-      VALUES (gen_random_uuid(), ${name}) 
-      RETURNING *
-    `;
+        // gen_random_uuid()는 Postgres 13+ 내장 함수. 
+        // 매개변수화된 쿼리($1) 사용
+        const { rows: newRows } = await pool.query(
+            `INSERT INTO users (id, name) VALUES (gen_random_uuid(), $1) RETURNING *`,
+            [name]
+        );
 
         return NextResponse.json(newRows[0]);
     } catch (error) {

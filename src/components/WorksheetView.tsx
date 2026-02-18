@@ -12,7 +12,7 @@ interface WorksheetViewProps {
         correctAnswer?: string;
     }>;
     onBack: () => void;
-    onComplete: (score: number) => void;
+    onComplete: (responses: UserResponseData[]) => void;
     onRetryIncorrect?: (incorrectProblems: Problem[]) => void;
     onGenerateSimilar?: (topics: string[]) => void;
 }

@@ -30,6 +30,7 @@ export default function Home() {
     problemCount: 10,
     schoolLevel: 'elementary',
     grade: 3,
+    difficulty: 'medium',
     selectedUnitId: undefined,
   });
 
@@ -138,11 +139,28 @@ export default function Home() {
     return <LoginView onLogin={handleLogin} />;
   }
 
+  // 5. 답안 제출 핸들러 (WorksheetView용)
+  const handleSubmitAnswer = async (problemId: string, answer: string, timeSpent: number) => {
+    const problem = currentProblems.find(p => p.id === problemId);
+    if (!problem) throw new Error('Problem not found');
+
+    const isCorrect = problem.answer === answer; // 단순 문자열 비교
+    return {
+      isCorrect,
+      correctAnswer: problem.answer
+    };
+  };
+
+  // ... (handleWorksheetComplete is already compatible now)
+
   if (showWorksheet) {
     return (
       <>
         <WorksheetView
+          worksheetId={`ws-${Date.now()}`}
           problems={currentProblems}
+          existingResponses={[]}
+          onSubmitAnswer={handleSubmitAnswer}
           onComplete={handleWorksheetComplete}
           onBack={handleBackToDashboard}
         />
