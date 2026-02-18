@@ -19,10 +19,10 @@ if (sanitizedUrl?.startsWith('prisma+postgres://')) {
   sanitizedUrl = sanitizedUrl.replace('prisma+postgres://', 'postgres://');
 }
 
-// Pool 생성 (SSL 강제)
+// Pool 생성 (SSL 설정 최적화)
 export const pool = new Pool({
-  connectionString: sanitizedUrl,
-  ssl: true,
+  connectionString: sanitizedUrl || '',
+  ssl: sanitizedUrl?.includes('localhost') ? false : { rejectUnauthorized: false },
 });
 
 // 사용자가 요청한 'db.query' 문법 대응을 위한 객체 수출

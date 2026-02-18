@@ -23,12 +23,24 @@ export default function LoginView({ onLogin }: { onLogin: (user: any) => void })
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: trimmedName }),
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.error || '오류 발생');
+
+            let data;
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(`Server Error: ${text.substring(0, 50)}`);
+            }
+
+            if (!response.ok) {
+                throw new Error(data.error || '오류가 발생했습니다.');
+            }
 
             localStorage.setItem('mathdaily_user', JSON.stringify(data));
             onLogin(data);
         } catch (err: any) {
+            console.error('[Login Error]:', err);
             setError(err.message);
         } finally {
             setIsLoading(false);
