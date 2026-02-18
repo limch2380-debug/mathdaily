@@ -1,17 +1,34 @@
 import { neon, neonConfig } from '@neondatabase/serverless';
 
-// 404 에러 방지를 위해 필요한 경우에만 클라이언트를 생성하도록 구조 변경
 const getSanitizedUrl = () => {
-  // 빌드 타임에는 환경 변수가 없을 수 있으므로 체크
+  // Vercel Postgres의 다양한 변수명 대응 (POSTGRES_URL이 우선순위)
   const url = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
+
   if (!url) return null;
 
-  // prisma+postgres:// -> postgres:// 변환
-  let sanitized = url;
-  if (sanitized.startsWith('prisma+')) {
-    sanitized = sanitized.replace('prisma+', '');
+  try {
+    // 1. prisma+ 접두사 제거
+    let cleanUrl = url.replace('prisma+', '');
+
+    // 2. URL 객체를 이용한 정밀 세척
+    const urlObj = new URL(cleanUrl);
+
+    // 3. 쿼리 파라미터(?sslmode=... 등)는 HTTP 드라이버를 혼란스럽게 하므로 완전 제거
+    urlObj.search = "";
+
+    // 4. Neon HTTP 드라이버는 pooler 호스트보다 direct 호스트를 선호함
+    // 호스트명에 -pooler 가 있다면 제거 (예: ep-xxx-pooler.region -> ep-xxx.region)
+    if (urlObj.hostname.includes('-pooler')) {
+      urlObj.hostname = urlObj.hostname.replace('-pooler', '');
+    }
+
+    const finalUrl = urlObj.toString();
+    console.log('[DB] Attempting connection to host:', urlObj.hostname);
+    return finalUrl;
+  } catch (e) {
+    console.warn('[DB] URL parsing failed, using raw string');
+    return url;
   }
-  return sanitized;
 };
 
 // SQL 실행 함수 (싱글톤 패턴으로 필요할 때 초기화)
