@@ -9,10 +9,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '이름을 입력해야 합니다.' }, { status: 400 });
     }
 
-    // 1. 테이블 자동 생성 (매번 체크하여 안전하게 유지)
-    await initializeDatabase();
+    // 1. DB 초기화 시도
+    try {
+      await initializeDatabase();
+    } catch (initError: any) {
+      console.error('[CRITICAL] DB Initialization Failed:', initError);
+      return NextResponse.json({
+        error: `DB 초기화 실패: ${initError.message}`,
+        suggestion: 'Vercel 프로젝트 설정에서 DATABASE_URL 또는 POSTGRES_URL 환경 변수가 제대로 등록되었는지 확인해주세요.'
+      }, { status: 500 });
+    }
 
-    // 2. 사용자 확인 및 생성 (UUID 사용)
+    // 2. 유저 처리
     const trimmedName = name.trim();
     let { rows } = await db.query('SELECT * FROM users WHERE name = $1 LIMIT 1', [trimmedName]);
 
@@ -27,9 +35,6 @@ export async function POST(request: Request) {
     return NextResponse.json(rows[0]);
   } catch (error: any) {
     console.error('[SERVER ERROR]:', error);
-    return NextResponse.json({
-      error: '데이터베이스 연결 실패 혹은 서버 오류가 발생했습니다.',
-      details: error.message
-    }, { status: 500 });
+    return NextResponse.json({ error: `서버 내부 오류: ${error.message}` }, { status: 500 });
   }
 }

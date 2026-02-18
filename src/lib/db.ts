@@ -9,8 +9,8 @@ if (typeof window === 'undefined') {
 // 환경 변수 감지 (Vercel Postgres의 모든 케이스 대응)
 const connectionString =
   process.env.POSTGRES_URL ||
-  process.env.POSTGRES_PRISMA_URL ||
   process.env.DATABASE_URL ||
+  process.env.POSTGRES_PRISMA_URL ||
   process.env.POSTGRES_URL_NON_POOLING;
 
 // prisma+ 가 붙은 경우 순수 postgres:// 로 변환
@@ -19,9 +19,10 @@ if (sanitizedUrl?.startsWith('prisma+postgres://')) {
   sanitizedUrl = sanitizedUrl.replace('prisma+postgres://', 'postgres://');
 }
 
-// Pool 생성
+// Pool 생성 (SSL 강제)
 export const pool = new Pool({
   connectionString: sanitizedUrl,
+  ssl: true,
 });
 
 // 사용자가 요청한 'db.query' 문법 대응을 위한 객체 수출
@@ -35,7 +36,15 @@ export const db = {
 export async function initializeDatabase() {
   if (typeof window !== 'undefined') return;
 
+  if (!sanitizedUrl) {
+    throw new Error('데이터베이스 연결 문자열(DATABASE_URL 또는 POSTGRES_URL)이 환경 변수에 설정되지 않았습니다.');
+  }
+
   try {
+    // 1. UUID 생성을 위해 필요한 확장 기능 설치
+    await db.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
+
+    // 2. users 테이블
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,6 +53,7 @@ export async function initializeDatabase() {
       );
     `);
 
+    // 3. study_sessions 테이블
     await db.query(`
       CREATE TABLE IF NOT EXISTS study_sessions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,9 +65,10 @@ export async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('[DB] Tables checked/created.');
-  } catch (error) {
-    console.error('[DB] Init Error:', error);
+    console.log('[DB] Initialization Success');
+  } catch (error: any) {
+    console.error('[DB] Initialization Error Details:', error);
+    throw error;
   }
 }
 
