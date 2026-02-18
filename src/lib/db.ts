@@ -1,41 +1,40 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import ws from 'ws';
+import { neon, neonConfig } from '@neondatabase/serverless';
 
-// Neon Serverless 전용 설정: WebSocket 강제 사용으로 HTTP 404 오류 방지
-if (typeof window === 'undefined') {
-  neonConfig.webSocketConstructor = ws;
-}
+// HTTP 통신을 기본으로 하여 WebSocket 404 에러 원천 차단
+neonConfig.fetchConnectionCache = true;
 
 const getSanitizedUrl = () => {
   let url = process.env.POSTGRES_URL || process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL;
-
   if (!url) return null;
 
-  // 1. prisma+postgres:// -> postgres:// 변환
+  // prisma+postgres:// -> postgres:// 변환
   if (url.startsWith('prisma+')) {
     url = url.replace('prisma+', '');
   }
-
-  // 2. URL 파싱 및 정리 (Neon 드라이버는 표준 형식을 선호함)
-  try {
-    const urlObj = new URL(url);
-    return urlObj.toString();
-  } catch (e) {
-    return url;
-  }
+  return url;
 };
 
 const sanitizedUrl = getSanitizedUrl();
 
-export const pool = new Pool({
-  connectionString: sanitizedUrl || '',
-  // Vercel/Neon 환경에서는 rejectUnauthorized: false가 가장 안정적입니다.
-  ssl: { rejectUnauthorized: false },
-  connectionTimeoutMillis: 10000,
-});
+// HTTP 기반의 SQL 실행기 (neon) 사용
+const sql = sanitizedUrl ? neon(sanitizedUrl) : null;
 
 export const db = {
-  query: (text: string, params?: any[]) => pool.query(text, params),
+  query: async (text: string, params: any[] = []) => {
+    if (!sql) {
+      console.error('[DB] No SQL client available - check environment variables');
+      throw new Error('Database connection URL is missing.');
+    }
+
+    try {
+      // neon client는 rows 배열을 직접 반환함
+      const rows = await sql(text, params);
+      return { rows: Array.isArray(rows) ? rows : [rows] };
+    } catch (err: any) {
+      console.error('[DB Query Error]:', err.message);
+      throw err;
+    }
+  },
 };
 
 export async function initializeDatabase() {
@@ -47,12 +46,12 @@ export async function initializeDatabase() {
   }
 
   try {
-    console.debug('[DB] Initialization started...');
+    console.log('[DB] HTTP Initialization started...');
 
     // 1. UUID 확장을 먼저 생성
     await db.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
-    // 2. 테이블 생성
+    // 2. 유저 테이블 생성
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -61,6 +60,7 @@ export async function initializeDatabase() {
       );
     `);
 
+    // 3. 세션 테이블 생성
     await db.query(`
       CREATE TABLE IF NOT EXISTS study_sessions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -72,11 +72,11 @@ export async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log('[DB] Initialization Success');
+    console.log('[DB] HTTP Initialization Success');
   } catch (error: any) {
-    console.error('[DB] Initialization Failed:', error.message);
+    console.error('[DB] HTTP Initialization Failed:', error.message);
     throw error;
   }
 }
 
-export default pool;
+export default db;
