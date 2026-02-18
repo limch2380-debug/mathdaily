@@ -25,7 +25,7 @@ export default function LoginView({ onLogin }: { onLogin: (user: any) => void })
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || '오류 발생');
-            
+
             localStorage.setItem('mathdaily_user', JSON.stringify(data));
             onLogin(data);
         } catch (err: any) {
@@ -36,48 +36,127 @@ export default function LoginView({ onLogin }: { onLogin: (user: any) => void })
     };
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
-            <div className="w-full max-w-xl bg-white/80 backdrop-blur-xl rounded-[40px] shadow-2xl p-12 space-y-10 border border-white">
-                <div className="text-center space-y-4">
-                    <h1 className="text-6xl font-black text-blue-600 tracking-tight">MathDaily</h1>
-                    <p className="text-xl text-gray-500 font-medium">매일 만나는 AI 맞춤 수학 학습지</p>
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '100vh',
+            width: '100%',
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
+            padding: '2rem'
+        }}>
+            <div style={{
+                width: '100%',
+                maxWidth: '600px',
+                backgroundColor: 'rgba(30, 41, 59, 0.7)',
+                backdropFilter: 'blur(20px)',
+                borderRadius: '40px',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                padding: '3.5rem',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                textAlign: 'center'
+            }}>
+                <div style={{ marginBottom: '3rem' }}>
+                    <h1 style={{
+                        fontSize: '5rem',
+                        fontWeight: '900',
+                        color: '#60a5fa',
+                        marginBottom: '1rem',
+                        letterSpacing: '-2px'
+                    }}>
+                        MathDaily
+                    </h1>
+                    <p style={{ fontSize: '1.5rem', color: '#94a3b8', fontWeight: '500' }}>
+                        매일 만나는 AI 맞춤 수학 학습지
+                    </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    <div className="space-y-4">
-                        <label className="text-xl font-bold text-gray-700 ml-2">이름을 입력하세요</label>
+                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                    <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <label style={{ fontSize: '1.5rem', fontWeight: '700', color: '#f1f5f9', marginLeft: '0.5rem' }}>
+                            이름을 입력하세요
+                        </label>
                         <input
                             type="text"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                if (error) setError(null);
+                            }}
                             placeholder="예: 홍길동"
-                            className="w-full px-8 py-6 text-2xl rounded-3xl border-2 border-gray-100 focus:border-blue-500 outline-none transition-all"
+                            style={{
+                                width: '100%',
+                                padding: '1.5rem 2rem',
+                                fontSize: '2rem',
+                                borderRadius: '24px',
+                                border: '2px solid rgba(255, 255, 255, 0.1)',
+                                backgroundColor: 'rgba(15, 23, 42, 0.5)',
+                                color: 'white',
+                                outline: 'none',
+                                transition: 'all 0.2s'
+                            }}
                             autoFocus
                         />
                     </div>
 
                     {error && (
-                        <div className="p-4 bg-red-50 border border-red-100 rounded-2xl animate-shake">
-                            <span className="text-red-500 text-lg">⚠️ {error}</span>
+                        <div className="animate-shake" style={{
+                            padding: '1.2rem',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            border: '1px solid rgba(239, 68, 68, 0.2)',
+                            borderRadius: '20px',
+                            color: '#f87171',
+                            fontSize: '1.2rem',
+                            fontWeight: '500',
+                            textAlign: 'left'
+                        }}>
+                            ⚠️ {error}
                         </div>
                     )}
 
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full py-6 bg-blue-600 hover:bg-blue-700 text-white text-2xl font-bold rounded-3xl shadow-xl transition-all active:scale-[0.98]"
+                        style={{
+                            width: '100%',
+                            padding: '1.8rem',
+                            backgroundColor: '#3b82f6',
+                            color: 'white',
+                            fontSize: '2rem',
+                            fontWeight: '800',
+                            borderRadius: '24px',
+                            border: 'none',
+                            cursor: isLoading ? 'not-allowed' : 'pointer',
+                            opacity: isLoading ? 0.7 : 1,
+                            transition: 'all 0.2s',
+                            boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.5)'
+                        }}
                     >
-                        {isLoading ? '확인 중...' : '학습 시작하기'}
+                        {isLoading ? '연결 중...' : '학습 시작하기'}
                     </button>
                 </form>
             </div>
             <style jsx>{`
                 @keyframes shake {
                     0%, 100% { transform: translateX(0); }
-                    25% { transform: translateX(-5px); }
-                    75% { transform: translateX(5px); }
+                    25% { transform: translateX(-10px); }
+                    75% { transform: translateX(10px); }
                 }
                 .animate-shake { animation: shake 0.2s ease-in-out 0s 2; }
+                input:focus {
+                    border-color: #3b82f6 !important;
+                    background-color: rgba(15, 23, 42, 0.8) !important;
+                    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.1);
+                }
+                button:hover:not(:disabled) {
+                    background-color: #2563eb;
+                    transform: translateY(-2px);
+                    box-shadow: 0 20px 30px -10px rgba(59, 130, 246, 0.6);
+                }
+                button:active:not(:disabled) {
+                    transform: scale(0.98);
+                }
             `}</style>
         </div>
     );
