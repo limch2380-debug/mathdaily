@@ -44,7 +44,8 @@ export const db = {
     }
 
     try {
-      const rows = await sql(text, params);
+      // Neon HTTP 드라이버의 최신 버전에서는 sql.query(text, params) 형식을 사용해야 함
+      const rows = await (sql as any).query(text, params);
       return { rows: Array.isArray(rows) ? rows : [rows] };
     } catch (err: any) {
       console.error('[DB Query Error]:', err.message);
