@@ -1,0 +1,38 @@
+# Next.js
+.next/
+out/
+build/
+node_modules/
+
+# Environment variables (API keys, secrets)
+.env
+.env.local
+.env.*.local
+server/.env
+
+# Vercel
+.vercel
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+*.egg
+venv/
+.venv/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
